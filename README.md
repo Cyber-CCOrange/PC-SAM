@@ -18,7 +18,7 @@ The dataset directory should be organized as follows:
 
 ```
 datasets/
-└── dataset/
+└── [dataset_name]/
     ├── input
     ├── gt-mask
     ├── valid-input
