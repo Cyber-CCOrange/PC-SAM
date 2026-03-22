@@ -1,0 +1,38 @@
+# Training/Validation configuration for maskpoint_sam_train_recon.py
+
+# model & checkpoint
+sam_model: "vit_b"
+model: "sam_vit_b_01ec64.pth"         # filename under checkpoint_dir
+checkpoint_dir: "sam-checkpoint"      # folder for SAM pretrained checkpoints
+model_checkpoint_save_dir: "train-checkpoint"
+model_save_name: "PC-SAM_DG"
+
+# prompts
+num_prompt_points: 20
+fore_rate: 0.5
+num_prompt_points_delta: 1.3
+fore_rate_delta: 1.0
+patch_size: 32
+fn_sample_points_per_patch: 1
+fp_sample_points_per_patch: 1
+fn_op_kernel_size: 3
+fp_op_kernel_size: 7
+
+# training control (CLI flags --valid/--valid_best/--load_model can override at runtime)
+valid_mode: False            # not consumed directly; use --valid to enable
+valid_best: False           # not consumed directly; use --valid_best
+load_model: False            # can be overridden by --load_model
+start_epoch: 0
+epochs: 200
+batch_size: 2
+lr: 0.00001
+seed: 3407
+Best_IoU: 0.0
+
+# data paths
+input_dir: "datasets/DeepGlobe/input"
+output_dir: "datasets/DeepGlobe/PC-SAM/train-output"
+gt_mask_dir: "datasets/DeepGlobe/gt-mask"
+valid_input_dir: "datasets/DeepGlobe/valid-input"
+valid_output_dir: "datasets/DeepGlobe/PC-SAM/valid-output"
+valid_mask_dir: "datasets/DeepGlobe/valid-mask"

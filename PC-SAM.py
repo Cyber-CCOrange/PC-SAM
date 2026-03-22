@@ -132,6 +132,9 @@ def main():
         if param.requires_grad:
             print(name)
 
+    if not model_checkpoint_save_dir.exists():
+        model_checkpoint_save_dir.mkdir(parents=True, exist_ok=True)
+
     if load_model:
         checkpoint = torch.load(str(model_checkpoint_save_dir / model_save_name) + ".pth", map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'], strict=False)
@@ -827,7 +830,7 @@ def main():
                 print(f'{input_image_name} Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=test_iou_log)
                 
                 if valid_show_img_mask:
-                    print(f"image name: {input_image_name}, Auto Segment IoU: {iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}")
+                    print(f"image name: {input_image_name}, Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}")
                     show_img_mask(
                         img=input_image.squeeze(0).cpu(),
                         gt_mask=gt_mask.squeeze(0).cpu(),
@@ -845,7 +848,10 @@ def main():
             # oare_repaired_part_iou = repaired_part_metric.IOU()[1]
             # oare_model_iou = model_metric.IOU()[1]
 
-            valid_log = open('logs/'+model_save_name+'_test.log','a')
+            valid_log_dir = 'logs/' + model_save_name + '_test.log'
+            if not os.path.exists(valid_log_dir):
+                os.makedirs(os.path.dirname(valid_log_dir), exist_ok=True)
+            valid_log = open(valid_log_dir,'a')
             print(f'Valid completed.')
             print("****************", file=valid_log)
             print(f"Test Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}", file=valid_log)
