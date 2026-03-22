@@ -101,8 +101,13 @@ class patch_constrained_sam(nn.Module):
         # image_embedding = im_outputs[-1]
 
         # Forward pass
+
+        none_points_p = torch.empty((1, 0, 2)).to(image_embedding.device)
+        none_points_l = torch.empty((1, 0)).to(image_embedding.device)
+        none_points = (none_points_p, none_points_l)
+
         sparse_embeddings, dense_embeddings = self.prompt_encoder(
-            points=None,
+            points=none_points,
             boxes=None,
             masks=None,
         )
