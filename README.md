@@ -2,7 +2,7 @@
 
 This repository provides the implementation of **PC-SAM**, a fine-grained interactive road segmentation model for high-resolution remote sensing images.
 
-PC-SAM supports both **automatic road segmentation** and **interactive segmentation refinement**. By using point prompts, users can correct segmentation errors locally and obtain more accurate road extraction results.
+PC-SAM supports both **automatic road segmentation** and **interactive segmentation refinement**. By using point prompts, users can correct segmentation errors locally and obtain more accurate road segmentation masks.
 
 ---
 
