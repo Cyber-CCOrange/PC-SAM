@@ -54,7 +54,7 @@ def compute_iou_binary(mask_bin: torch.Tensor, gt_mask: torch.Tensor, mean=True,
 
     return IoU
 
-def compute_F1(mask_bin, gt_mask, eps=False):
+def compute_F1(mask_bin, gt_mask, eps=False, pre_rec=False):
     """
     Computer F1 score.
 
@@ -63,7 +63,10 @@ def compute_F1(mask_bin, gt_mask, eps=False):
         gt_mask (torch.Tensor): Shape (B, H, W) or (B, 1, H, W)
 
     Return:
-        F1 socre (scalar)
+        if pre_rec is True:
+            return F1 score, precision, recall
+        else:
+            return F1 score
 
     """
     if len(mask_bin.shape) == 4:
@@ -91,5 +94,9 @@ def compute_F1(mask_bin, gt_mask, eps=False):
         f1 = (2 * precision * recall) / (precision + recall)
     else:
         f1 = (2 * precision * recall + eps) / (precision + recall + eps)
+    
+    if pre_rec is True:
+        return f1, precision, recall
+    else:
+        return f1
 
-    return f1

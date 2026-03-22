@@ -23,7 +23,7 @@ from utils.metric import SegmentationMetric
 from tqdm import tqdm
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="MaskPoint SAM Training/Validation with YAML config")
+    parser = argparse.ArgumentParser(description="PC-SAM Training/Validation with YAML config")
     parser.add_argument('--config', type=str, required=True, help='Path to config YAML file')
     parser.add_argument('--valid', action='store_true', help='Run in validation mode')
     parser.add_argument('--valid_best', action='store_true', help='Use best model for validation')
@@ -40,8 +40,10 @@ def parse_args():
     parser.add_argument('--fore_rate_delta', type=float, default=None, help='Override fore rate delta')
     parser.add_argument('--fore_rate', type=float, default=None, help='Override fore rate')
     parser.add_argument('--patch_size', type=int, default=None, help='Override patch size')
-    parser.add_argument('--fn_op_kernel_size', type=int, default=None, help='Override patch size')
-    parser.add_argument('--fp_op_kernel_size', type=int, default=None, help='Override patch size')
+    parser.add_argument('--fn_op_kernel_size', type=int, default=None, help='Override fn_op_kernel_size')
+    parser.add_argument('--fp_op_kernel_size', type=int, default=None, help='Override fp_op_kernel_size')
+    parser.add_argument('--fn_sample_points_per_patch', type=int, default=None, help='Override fn_sample_points_per_patch')
+    parser.add_argument('--fp_sample_points_per_patch', type=int, default=None, help='Override fp_sample_points_per_patch')
     return parser.parse_args()
 
 def load_config(config_path):
@@ -61,8 +63,8 @@ def main():
     patch_size = args.patch_size if args.patch_size is not None else config.get('patch_size', 32)
     fn_op_kernel_size = args.fn_op_kernel_size if args.fn_op_kernel_size is not None else config.get('fn_op_kernel_size', 3)
     fp_op_kernel_size = args.fp_op_kernel_size if args.fp_op_kernel_size is not None else config.get('fp_op_kernel_size', 13)
-    fn_sample_points_per_patch = config.get('fn_sample_points_per_patch', 1)
-    fp_sample_points_per_patch = config.get('fp_sample_points_per_patch', 1)
+    fn_sample_points_per_patch = args.fn_sample_points_per_patch if args.fn_sample_points_per_patch is not None else config.get('fn_sample_points_per_patch', 1)
+    fp_sample_points_per_patch = args.fp_sample_points_per_patch if args.fp_sample_points_per_patch is not None else config.get('fp_sample_points_per_patch', 1)
     model_name = config.get('model', "sam_vit_b_01ec64.pth")
     model_save_name = config.get('model_save_name')
     log_file = "logs/" + model_save_name + ".txt"
@@ -188,8 +190,8 @@ def main():
     # 优化器1:
     optimizer = torch.optim.AdamW([
         {"params": mask_decoder_params, "lr": lr},
-        {"params": repair_patch_decoder_params, "lr": lr},
         {"params": prompt_decoder_params, "lr": lr},
+        {"params": repair_patch_decoder_params, "lr": lr * 10},
         {"params": lora_params, "lr": lr * 10},
         {"params": fusion_head_params, "lr": lr * 10},
         ],
@@ -198,7 +200,7 @@ def main():
     # 5. 数据集和dataloader
     dataset = SamDataset(image_dir=str(input_dir), gt_mask_dir=str(gt_mask_dir))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=not valid_mode, num_workers=0)
-    scheduler = LR_Scheduler(mode="poly", base_lr=lr, num_epochs=epochs, iters_per_epoch=len(dataloader), power=3, base_lr_groups=3)
+    scheduler = LR_Scheduler(mode="poly", base_lr=lr, num_epochs=epochs, iters_per_epoch=len(dataloader), power=3, base_lr_groups=2)
     loss_dice = DiceLoss()
     loss_focal = FocalLoss()
     loss_ss = SSLoss(kernel_size=5, only_one=False)
@@ -327,13 +329,13 @@ def main():
                 # show_tensor_image(delete_part, is_mask=False)
                 # show_tensor_image(delete_label, is_mask=True)
 
-                # loss_delete_part = 0.3 * loss_dice(upscaled_masks, neg_label, gt_mask) + 0.7 * loss_focal(upscaled_masks, neg_label, gt_mask)
+                loss_delete_part = 0.3 * loss_dice(upscaled_masks, neg_label, gt_mask) + 0.7 * loss_focal(upscaled_masks, neg_label, gt_mask)
                 loss_iou_prompt = loss_mse(iou_prompt_predict, prompt_iou)
                 loss_prompt = 0.3 * loss_dice(prompt_masks, gt_mask) + + 0.65 * loss_focal(prompt_masks, gt_mask) + 0.05 * loss_ss(prompt_masks, gt_mask)
                 loss_neg = 0.3 * loss_dice(upscaled_masks, neg_label) + 0.7 * loss_focal(upscaled_masks, neg_label)
                 loss_pos = 0.3 * loss_dice(repaired_masks, pos_label) + 0.7 * loss_focal(repaired_masks, pos_label)
                 loss_model = 0.3 * loss_dice(model_logits, model_label) + 0.7 * loss_focal(model_logits, model_label)
-                loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt #+ loss_delete_part
+                loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt + 0.1 * loss_delete_part
                 # loss = loss_prompt + loss_iou_prompt
                 # print(loss_delete_part)
                 scheduler(optimizer, idx, epoch, Best_IoU)
@@ -444,21 +446,62 @@ def main():
 
             Total_Loss = 0.0
             Loss_Count = 0
-            Prompt_IoU = 0.0
-            IoU = 0.0
-            Repaired_Part_IoU = 0.0
+
             Prompt_IoU_Predict = 0.0
-            F1_Fusion = 0.0
-            F1_TwoMask = 0.0
+            Prompt_IoU = 0.0
+            Prompt_F1 = 0.0
+            Prompt_Precision = 0.0
+            Prompt_Recall = 0.0
             Prompt_IoU_Count = 0
-            IoU_Count = 0
-            Repaired_Part_Count = 0
-            Model_IoU = 0.0
-            Model_IoU_Count = 0
+            Prompt_F1_Count = 0
+            Prompt_Precision_Count = 0
+            Prompt_Recall_Count = 0
+
+            Auto_Segment_IoU = 0.0
+            Auto_Segment_F1 = 0.0
+            Auto_Segment_Precision = 0.0
+            Auto_Segment_Recall = 0.0
+            Auto_Segment_IoU_Count = 0
+            Auto_Segment_F1_Count = 0
+            Auto_Segment_Precision_Count = 0
+            Auto_Segment_Recall_Count = 0
+
+            Neg_Segment_IoU = 0.0
+            Neg_Segment_F1 = 0.0
+            Neg_Segment_Precision = 0.0
+            Neg_Segment_Recall = 0.0
+            Neg_Segment_IoU_Count = 0
+            Neg_Segment_F1_Count = 0
+            Neg_Segment_Precision_Count = 0
+            Neg_Segment_Recall_Count = 0
+
+            Repaired_Part_IoU = 0.0
+            Repaired_Part_F1 = 0.0
+            Repaired_Part_Precision = 0.0
+            Repaired_Part_Recall = 0.0
+            Repaired_Part_IoU_Count = 0
+            Repaired_Part_F1_Count = 0
+            Repaired_Part_Precision_Count = 0
+            Repaired_Part_Recall_Count = 0
+
+            Model_Fusion_IoU = 0.0
+            Model_Fusion_F1 = 0.0
+            Model_Fusion_Precision = 0.0
+            Model_Fusion_Recall = 0.0
+            Model_Fusion_IoU_Count = 0
+            Model_Fusion_F1_Count = 0
+            Model_Fusion_Precision_Count = 0
+            Model_Fusion_Recall_Count = 0
+
             Model_TwoMask_IoU = 0.0
+            Model_TwoMask_F1 = 0.0
+            Model_TwoMask_Precision = 0.0
+            Model_TwoMask_Recall = 0.0
             Model_TwoMask_IoU_Count = 0
-            F1_Fusion_Count = 0
-            F1_TwoMask_Count = 0
+            Model_TwoMask_F1_Count = 0
+            Model_TwoMask_Precision_Count = 0
+            Model_TwoMask_Recall_Count = 0
+
 
             dataloader_iter = iter(dataloader)
             tqdm_loader = tqdm(dataloader_iter)
@@ -519,12 +562,17 @@ def main():
                 model_twomask = ((neg_mask_bin + repaired_part_mask_bin) > 0).float()
 
                 prompt_iou = compute_iou_binary(hr_bin, gt_mask)
-                iou = compute_iou_binary(neg_mask_bin, gt_mask)
+                auto_segment_iou = compute_iou_binary(auto_mask_bin, gt_mask)
+                neg_segment_iou = compute_iou_binary(neg_mask_bin, gt_mask)
                 repaired_part_iou = compute_iou_binary(repaired_part_mask_bin, pos_label)
-                model_iou = compute_iou_binary(model_fusionmask, gt_mask)
+                model_fusion_iou = compute_iou_binary(model_fusionmask, gt_mask, )
                 model_twomask_iou = compute_iou_binary(model_twomask, gt_mask)
-                f1_score_fusion = compute_F1(model_fusionmask, gt_mask)
-                f1_score_twomask = compute_F1(model_twomask, gt_mask)
+                f1_prompt, prompt_precision, prompt_recall = compute_F1(hr_bin, gt_mask, pre_rec=True)
+                f1_auto_segment, auto_segment_precision, auto_segment_recall = compute_F1(auto_mask_bin, gt_mask, pre_rec=True)
+                f1_neg_segment, neg_segment_precision, neg_segment_recall = compute_F1(neg_mask_bin, gt_mask, pre_rec=True)
+                f1_repaired_part, repaired_part_precision, repaired_part_recall = compute_F1(repaired_part_mask_bin, pos_label, pre_rec=True)
+                f1_score_fusion, model_fusion_precision, model_fusion_recall = compute_F1(model_fusionmask, gt_mask, pre_rec=True)
+                f1_score_twomask, model_twomask_precision, model_twomask_recall = compute_F1(model_twomask, gt_mask, pre_rec=True)
 
                 # metric.CM(gt_mask.cpu(), mask_bin.squeeze(1).cpu().data.numpy())
                 # repaired_part_metric.CM(pos_label.cpu(), repaired_part_mask_bin.squeeze(1).cpu().data.numpy())
@@ -546,54 +594,209 @@ def main():
                     Loss_Count += 1
                 avg_loss = Total_Loss / (idx+1)
 
+
+                # Precision
+                if not torch.isnan(auto_segment_precision):
+                    Auto_Segment_Precision += auto_segment_precision
+                    Auto_Segment_Precision_Count += 1
+                if not torch.isnan(prompt_precision):
+                    Prompt_Precision += prompt_precision
+                    Prompt_Precision_Count += 1
+                if not torch.isnan(neg_segment_precision):
+                    Neg_Segment_Precision += neg_segment_precision
+                    Neg_Segment_Precision_Count += 1
+                if not torch.isnan(repaired_part_precision):
+                    Repaired_Part_Precision += repaired_part_precision
+                    Repaired_Part_Precision_Count += 1
+                if not torch.isnan(model_fusion_precision):
+                    Model_Fusion_Precision += model_fusion_precision
+                    Model_Fusion_Precision_Count += 1
+                if not torch.isnan(model_twomask_precision):
+                    Model_TwoMask_Precision += model_twomask_precision
+                    Model_TwoMask_Precision_Count += 1
+                
+                # Recall
+                if not torch.isnan(auto_segment_recall):
+                    Auto_Segment_Recall += auto_segment_recall
+                    Auto_Segment_Recall_Count += 1
+                if not torch.isnan(prompt_recall):
+                    Prompt_Recall += prompt_recall
+                    Prompt_Recall_Count += 1
+                if not torch.isnan(neg_segment_recall):
+                    Neg_Segment_Recall += neg_segment_recall
+                    Neg_Segment_Recall_Count += 1
+                if not torch.isnan(repaired_part_recall):
+                    Repaired_Part_Recall += repaired_part_recall
+                    Repaired_Part_Recall_Count += 1
+                if not torch.isnan(model_fusion_recall):
+                    Model_Fusion_Recall += model_fusion_recall
+                    Model_Fusion_Recall_Count += 1
+                if not torch.isnan(model_twomask_recall):
+                    Model_TwoMask_Recall += model_twomask_recall
+                    Model_TwoMask_Recall_Count += 1
+        
+                # IoU
+                if not torch.isnan(auto_segment_iou):
+                    Auto_Segment_IoU += auto_segment_iou
+                    Auto_Segment_IoU_Count += 1
                 if not torch.isnan(prompt_iou):
                     Prompt_IoU += prompt_iou
                     Prompt_IoU_Count += 1
-                if not torch.isnan(iou):
-                    IoU += iou
-                    IoU_Count += 1
+                if not torch.isnan(neg_segment_iou):
+                    Neg_Segment_IoU += neg_segment_iou
+                    Neg_Segment_IoU_Count += 1
                 if not torch.isnan(repaired_part_iou):
                     Repaired_Part_IoU += repaired_part_iou
-                    Repaired_Part_Count += 1
-                if not torch.isnan(model_iou):
-                    Model_IoU += model_iou
-                    Model_IoU_Count += 1
+                    Repaired_Part_IoU_Count += 1
+                if not torch.isnan(model_fusion_iou):
+                    Model_Fusion_IoU += model_fusion_iou
+                    Model_Fusion_IoU_Count += 1
                 if not torch.isnan(model_twomask_iou):
                     Model_TwoMask_IoU += model_twomask_iou
                     Model_TwoMask_IoU_Count += 1
-                if not torch.isnan(f1_score_fusion):
-                    F1_Fusion += f1_score_fusion
-                    F1_Fusion_Count += 1
-                if not torch.isnan(f1_score_twomask):
-                    F1_TwoMask += f1_score_twomask
-                    F1_TwoMask_Count += 1
 
-                avg_prompt_iou = Prompt_IoU / Prompt_IoU_Count
-                avg_iou = IoU / IoU_Count
-                avg_repaired_part_iou = Repaired_Part_IoU / Repaired_Part_Count
-                avg_model_iou = Model_IoU / Model_IoU_Count
-                avg_twomask_iou = Model_TwoMask_IoU / Model_TwoMask_IoU_Count
-                avg_f1_fusion = F1_Fusion / F1_Fusion_Count
-                avg_f1_twomask = F1_TwoMask / F1_TwoMask_Count
-                
+                # F1
+                if not torch.isnan(f1_auto_segment):
+                    Auto_Segment_F1 += f1_auto_segment
+                    Auto_Segment_F1_Count += 1
+                if not torch.isnan(f1_prompt):
+                    Prompt_F1 += f1_prompt
+                    Prompt_F1_Count += 1
+                if not torch.isnan(f1_neg_segment):
+                    Neg_Segment_F1 += f1_neg_segment
+                    Neg_Segment_F1_Count += 1
+                if not torch.isnan(f1_repaired_part):
+                    Repaired_Part_F1 += f1_repaired_part
+                    Repaired_Part_F1_Count += 1
+                if not torch.isnan(f1_score_fusion):
+                    Model_Fusion_F1 += f1_score_fusion
+                    Model_Fusion_F1_Count += 1
+                if not torch.isnan(f1_score_twomask):
+                    Model_TwoMask_F1 += f1_score_twomask
+                    Model_TwoMask_F1_Count += 1
+
+                # Average Precision
+                if Auto_Segment_Precision_Count != 0:
+                    avg_auto_segment_precision = Auto_Segment_Precision / Auto_Segment_Precision_Count
+                else:
+                    avg_auto_segment_precision = torch.tensor(0.0)
+                if Prompt_Precision_Count != 0:
+                    avg_prompt_precision = Prompt_Precision / Prompt_Precision_Count
+                else:
+                    avg_prompt_precision = torch.tensor(0.0)
+                if Neg_Segment_Precision_Count != 0:
+                    avg_neg_precision = Neg_Segment_Precision / Neg_Segment_Precision_Count
+                else:
+                    avg_neg_precision = torch.tensor(0.0)
+                if Repaired_Part_Precision_Count != 0:
+                    avg_repaired_part_precision = Repaired_Part_Precision / Repaired_Part_Precision_Count
+                else:
+                    avg_repaired_part_precision = torch.tensor(0.0)
+                if Model_Fusion_Precision_Count != 0:
+                    avg_fusion_precision = Model_Fusion_Precision / Model_Fusion_Precision_Count
+                else:
+                    avg_fusion_precision = torch.tensor(0.0)
+                if Model_TwoMask_Precision_Count != 0:
+                    avg_twomask_precision = Model_TwoMask_Precision / Model_TwoMask_Precision_Count
+                else:
+                    avg_twomask_precision = torch.tensor(0.0)
+
+                # Average Recall
+                if Auto_Segment_Recall_Count != 0:
+                    avg_auto_segment_recall = Auto_Segment_Recall / Auto_Segment_Recall_Count
+                else:
+                    avg_auto_segment_recall = torch.tensor(0.0)
+                if Prompt_Recall_Count != 0:
+                    avg_prompt_recall = Prompt_Recall / Prompt_Recall_Count
+                else:
+                    avg_prompt_recall = torch.tensor(0.0)
+                if Neg_Segment_Recall_Count != 0:
+                    avg_neg_recall = Neg_Segment_Recall / Neg_Segment_Recall_Count
+                else:
+                    avg_neg_recall = torch.tensor(0.0)
+                if Repaired_Part_Recall_Count != 0:
+                    avg_repaired_part_recall = Repaired_Part_Recall / Repaired_Part_Recall_Count
+                else:
+                    avg_repaired_part_recall = torch.tensor(0.0)
+                if Model_Fusion_Recall_Count != 0:
+                    avg_fusion_recall = Model_Fusion_Recall / Model_Fusion_Recall_Count
+                else:
+                    avg_fusion_recall = torch.tensor(0.0)
+                if Model_TwoMask_Recall_Count != 0:
+                    avg_twomask_recall = Model_TwoMask_Recall / Model_TwoMask_Recall_Count
+                else:
+                    avg_twomask_recall = torch.tensor(0.0)
+
+                # Average IoU
+                if Auto_Segment_IoU_Count != 0:
+                    avg_auto_segment_iou = Auto_Segment_IoU / Auto_Segment_IoU_Count
+                else:
+                    avg_auto_segment_iou = torch.tensor(0.0)
+                if Prompt_IoU_Count != 0:
+                    avg_prompt_iou = Prompt_IoU / Prompt_IoU_Count
+                else:
+                    avg_prompt_iou = torch.tensor(0.0)
+                if Neg_Segment_IoU_Count != 0:
+                    avg_neg_iou = Neg_Segment_IoU / Neg_Segment_IoU_Count
+                else:
+                    avg_neg_iou = torch.tensor(0.0)
+                if Repaired_Part_IoU_Count != 0:
+                    avg_repaired_part_iou = Repaired_Part_IoU / Repaired_Part_IoU_Count
+                else:
+                    avg_repaired_part_iou = torch.tensor(0.0)
+                if Model_Fusion_IoU_Count != 0:
+                    avg_fusion_iou = Model_Fusion_IoU / Model_Fusion_IoU_Count
+                else:
+                    avg_fusion_iou = torch.tensor(0.0)
+                if Model_TwoMask_IoU_Count != 0:
+                    avg_twomask_iou = Model_TwoMask_IoU / Model_TwoMask_IoU_Count
+                else:
+                    avg_twomask_iou = torch.tensor(0.0)
+
+                # Average F1
+                if Auto_Segment_F1_Count != 0:
+                    avg_auto_segment_f1 = Auto_Segment_F1 / Auto_Segment_F1_Count
+                else:
+                    avg_auto_segment_f1 = torch.tensor(0.0)
+                if Prompt_F1_Count != 0:
+                    avg_prompt_f1 = Prompt_F1 / Prompt_F1_Count
+                else:
+                    avg_prompt_f1 = torch.tensor(0.0)
+                if Neg_Segment_F1_Count != 0:
+                    avg_neg_f1 = Neg_Segment_F1 / Neg_Segment_F1_Count
+                else:
+                    avg_neg_f1 = torch.tensor(0.0)
+                if Repaired_Part_F1_Count != 0:
+                    avg_repaired_part_f1 = Repaired_Part_F1 / Repaired_Part_F1_Count
+                else:
+                    avg_repaired_part_f1 = torch.tensor(0.0)
+                if Model_Fusion_F1_Count != 0:
+                    avg_fusion_f1 = Model_Fusion_F1 / Model_Fusion_F1_Count
+                else:
+                    avg_fusion_f1 = torch.tensor(0.0)
+                if Model_TwoMask_F1_Count != 0:
+                    avg_twomask_f1 = Model_TwoMask_F1 / Model_TwoMask_F1_Count
+                else:
+                    avg_twomask_f1 = torch.tensor(0.0)
+
                 tqdm_loader.set_description(
                     f"Step [{idx+1}/{len(dataloader)}]"
                 )
                 tqdm_loader.set_postfix({
                     "Loss": f"{avg_loss:.4f}",
-                    "Auto Segment IoU": f"{avg_iou:.4f}",
+                    "Neg Segment IoU": f"{avg_neg_iou:.4f}",
                     "Additional Part IoU": f"{avg_repaired_part_iou:.4f}",
-                    "Model Fusion IoU": f"{avg_model_iou:.4f}",
+                    "Model Fusion IoU": f"{avg_fusion_iou:.4f}",
                     "Model Two Mask IoU": f"{avg_twomask_iou:.4f}",
-                    "Model Fusion F1": f"{avg_f1_fusion:.4f}",
-                    "Model Two Mask F1": f"{avg_f1_twomask:.4f}",
+                    "Model Fusion F1": f"{avg_fusion_f1:.4f}",
+                    "Model Two Mask F1": f"{avg_twomask_f1:.4f}",
                     "Prompt IoU": f"{avg_prompt_iou:.4f}",
                     "IoU Prompt Predict": f"{avg_iou_prompt_predict:.4f}",
                 })
                 
                 if idx % 100 == 0:
                     print(f"\nStep [{idx+1}/{len(dataloader)}],") 
-                    print(f"Loss: {avg_loss:.4f}, Auto Segment IoU: {avg_iou:.4f}, Additional Part IoU: {avg_repaired_part_iou:.4f}, Model Fusion IoU: {avg_model_iou:.4f}, Model Two Mask IoU: {avg_twomask_iou:.4f}, Model Fusion F1: {avg_f1_fusion:.4f}, Model Two Mask F1: {avg_f1_twomask:.4f}, Prompt IoU: {avg_prompt_iou:.4f}, IoU Prompt Predict: {avg_iou_prompt_predict:.4f}")
+                    print(f"Loss: {avg_loss:.4f}, Neg Segment IoU: {avg_neg_iou:.4f}, Additional Part IoU: {avg_repaired_part_iou:.4f}, Model Fusion IoU: {avg_fusion_iou:.4f}, Model Two Mask IoU: {avg_twomask_iou:.4f}, Model Fusion F1: {avg_fusion_f1:.4f}, Model Two Mask F1: {avg_twomask_f1:.4f}, Prompt IoU: {avg_prompt_iou:.4f}, IoU Prompt Predict: {avg_iou_prompt_predict:.4f}")
                 
                 # for i in range(input_image.shape[0]):
                 #     im_img = Image.fromarray(origin_input_image[i].cpu().numpy())
@@ -617,11 +820,11 @@ def main():
                 #     model_FusionHead_mask = model_fusionmask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
                 #     im_model_FusionHead_mask = Image.fromarray(model_FusionHead_mask)
                 #     im_model_FusionHead_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_6_fusionmask.png')}")
-                #     prompt_mask_img = prompt_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                #     prompt_mask_img = hr_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
                 #     im_prompt_mask = Image.fromarray(prompt_mask_img)
                 #     im_prompt_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_7_promptmask.png')}")
                 
-                print(f'{input_image_name} Auto Segment IoU: {iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=test_iou_log)
+                print(f'{input_image_name} Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=test_iou_log)
                 
                 if valid_show_img_mask:
                     print(f"image name: {input_image_name}, Auto Segment IoU: {iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}")
@@ -652,12 +855,32 @@ def main():
             print(f"fp differentiable opening erosion_kernel size: {fp_op_kernel_size}", file=valid_log)
             print(f'fn sample_points_per_patch: {fn_sample_points_per_patch}', file=valid_log)
             print(f'fp sample_points_per_patch: {fp_sample_points_per_patch}', file=valid_log)
-            print(f"Auto Segment IoU: {avg_iou.item():.4f}", file=valid_log)
-            print(f"Additional Part IoU: {avg_repaired_part_iou.item():.4f}", file=valid_log)
-            print(f"Model Fusion Head IoU: {avg_model_iou.item():.4f}, Model Two Mask IoU: {avg_twomask_iou.item():.4f}", file=valid_log)
-            print(f"Model Fusion F1: {avg_f1_fusion.item():.4f}, Model Two Mask F1: {avg_f1_twomask.item():.4f}", file=valid_log)
-            print(f"Prompt IoU: {avg_prompt_iou.item():.4f}", file=valid_log)
+            print(f"Auto Segment IoU: {avg_auto_segment_iou.item():.4f}", file=valid_log)
+            print(f"Auto Segment Precision: {avg_auto_segment_precision.item():.4f}", file=valid_log)
+            print(f"Auto Segment Recall: {avg_auto_segment_recall.item():.4f}", file=valid_log)
+            print(f"Auto Segment F1: {avg_auto_segment_f1.item():.4f}", file=valid_log)
             print(f"IoU Prompt Predict: {avg_iou_prompt_predict:.4f}", file=valid_log)
+            print(f"Prompt IoU: {avg_prompt_iou.item():.4f}", file=valid_log)
+            print(f"Prompt Precision: {avg_prompt_precision.item():.4f}", file=valid_log)
+            print(f"Prompt Recall: {avg_prompt_recall.item():.4f}", file=valid_log)
+            print(f"Prompt F1: {avg_prompt_f1.item():.4f}", file=valid_log)
+            print(f"Neg Segment IoU: {avg_neg_iou.item():.4f}", file=valid_log)
+            print(f"Neg Segment Precision: {avg_neg_precision.item():.4f}", file=valid_log)
+            print(f"Neg Segment Recall: {avg_neg_recall.item():.4f}", file=valid_log)
+            print(f"Neg Segment F1: {avg_neg_f1.item():.4f}", file=valid_log)
+            print(f"Additional Part IoU: {avg_repaired_part_iou.item():.4f}", file=valid_log)
+            print(f"Additional Part Precision: {avg_repaired_part_precision.item():.4f}", file=valid_log)
+            print(f"Additional Part Recall: {avg_repaired_part_recall.item():.4f}", file=valid_log)
+            print(f"Additional Part F1: {avg_repaired_part_f1.item():.4f}", file=valid_log)
+            print(f"Model Two Mask IoU: {avg_twomask_iou.item():.4f}", file=valid_log)
+            print(f"Model Two Mask Precision: {avg_twomask_precision.item():.4f}", file=valid_log)
+            print(f"Model Two Mask Recall: {avg_twomask_recall.item():.4f}", file=valid_log)
+            print(f"Model Two Mask F1: {avg_twomask_f1.item():.4f}", file=valid_log)
+            print(f"Model Fusion IoU: {avg_fusion_iou.item():.4f}", file=valid_log)
+            print(f"Model Fusion Precision: {avg_fusion_precision.item():.4f}", file=valid_log)
+            print(f"Model Fusion Recall: {avg_fusion_recall.item():.4f}", file=valid_log)
+            print(f"Model Fusion F1: {avg_fusion_f1.item():.4f}", file=valid_log)
+
 
 if __name__ == "__main__":
     main()
