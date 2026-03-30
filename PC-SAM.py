@@ -19,7 +19,6 @@ from modeling.patch_constrained_sam import patch_constrained_sam
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 from peft import LoraConfig, get_peft_model
-from utils.metric import SegmentationMetric
 from tqdm import tqdm
 
 def parse_args():
@@ -156,6 +155,18 @@ def main():
     print(f"Total parameters: {total_params/1e+6:.4f}M, Trainable parameters: {trainable_params/1e+6:.4f}M")
 
     # 获取需要更新的参数
+    image_encoder_params = [
+        p for n, p in model.named_parameters() 
+        if n.startswith("image_encoder")
+    ]
+    print(f'image_encoder parameters: {sum(p.numel() for p in image_encoder_params)/1e+6:.4f}M')
+
+    prompt_encoder_params = [
+        p for n, p in model.named_parameters() 
+        if n.startswith("prompt_encoder")
+    ]
+    print(f'prompt_encoder parameters: {sum(p.numel() for p in prompt_encoder_params)/1e+6:.4f}M')
+
     mask_decoder_params = [
         p for n, p in model.named_parameters() 
         if p.requires_grad and n.startswith("mask_decoder")
@@ -441,11 +452,14 @@ def main():
     else:
         with torch.no_grad():
             model.eval()
+            
+            if not os.path.exists('logs/'+model_save_name+'_test_iou.log'):
+                os.makedirs(os.path.dirname('logs/'+model_save_name+'_test_iou.log'), exist_ok=True)
 
-            test_iou_log = open('logs/'+model_save_name+'_test_iou.log','w')
-            print("****************", file=test_iou_log)
-            test_iou_log = open('logs/'+model_save_name+'_test_iou.log','a')
-            print(f"Test Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}", file=test_iou_log)
+            valid_iou_log = open('logs/'+model_save_name+'_test_iou.log','w')
+            print("****************", file=valid_iou_log)
+            valid_iou_log = open('logs/'+model_save_name+'_test_iou.log','a')
+            print(f"Test Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}", file=valid_iou_log)
 
             Total_Loss = 0.0
             Loss_Count = 0
@@ -827,7 +841,7 @@ def main():
                 #     im_prompt_mask = Image.fromarray(prompt_mask_img)
                 #     im_prompt_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_7_promptmask.png')}")
                 
-                print(f'{input_image_name} Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=test_iou_log)
+                print(f'{input_image_name} Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=valid_iou_log)
                 
                 if valid_show_img_mask:
                     print(f"image name: {input_image_name}, Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}")

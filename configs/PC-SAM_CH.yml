@@ -1,4 +1,4 @@
-# Training/Validation configuration for maskpoint_sam_train_recon.py
+# Training/Validation configuration for PC-SAM
 
 # model & checkpoint
 sam_model: "vit_b"
@@ -20,7 +20,7 @@ fp_op_kernel_size: 7
 
 # training control (CLI flags --valid/--valid_best/--load_model can override at runtime)
 valid_mode: False            # not consumed directly; use --valid to enable
-valid_best: False           # not consumed directly; use --valid_best
+valid_best: False           # not consumed directly; use --valid_best ** this is almost not used
 load_model: False            # can be overridden by --load_model
 start_epoch: 0
 epochs: 20
