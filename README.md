@@ -98,6 +98,12 @@ To save the predictions, add the argument:
 --save_valid_predictions
 ```
 
+The predictions will be saved in:
+
+```
+./datasets/[dataset_name]/PC-SAM/
+```
+
 ---
 
 # Visualization
