@@ -6,6 +6,14 @@ PC-SAM supports both **automatic road segmentation** and **interactive segmentat
 
 ---
 
+# SAM Checkpoint
+
+Put pretrained SAM-B model "sam_vit_b_01ec64.pth" in:
+
+```
+./sam-checkpoint/
+---
+
 # Dataset
 
 The dataset should be placed in:
