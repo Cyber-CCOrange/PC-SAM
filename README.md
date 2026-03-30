@@ -24,7 +24,7 @@ Before starting, place the pretrained SAM-B checkpoint "sam_vit_b_01ec64.pth" in
 The checkpoints of our PC-SAM can be downloaded from the following link:
 - **DeepGlobe**: [PC-SAM_DG.pth](https://drive.google.com/file/d/1NPiLz6NZYU7oCT6_KHJy4pX8C_Bsaxcs/view?usp=sharing)
 - **Massachusetts**: [PC-SAM_MA.pth](https://drive.google.com/file/d/1WB5QABsau9tg6YdRUjbjNDRiSvvI2vQQ/view?usp=sharing)
-- **CHN6-CUG**: [PC-SAM_CH.pth](https://drive.google.com/file/d/1WB5QABsau9tg6YdRUjbjNDRiSvvI2vQQ/view?usp=sharing)
+- **CHN6-CUG**: [PC-SAM_CH.pth](https://drive.google.com/file/d/12cbocA61KQIzeEcqRJDibwSXrkK1RmUx/view?usp=sharing)
 
 Place the PC-SAM checkpoints in:
 
