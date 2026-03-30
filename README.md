@@ -3,7 +3,7 @@
 This work is built upon the Segment Anything Model (SAM).
 
 - SAM GitHub: [https://github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything)
-- SAM-B pretrained model used in PC-SAM: [ViT-B SAM model](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth) 
+- SAM-B pretrained model used in PC-SAM: [ViT-B SAM model, sam_vit_b_01ec64.pth](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth) 
 
 # PC-SAM: Patch-Constrained Fine-Grained Interactive Road Segmentation in High-Resolution Remote Sensing Images
 
