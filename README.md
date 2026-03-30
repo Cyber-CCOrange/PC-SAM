@@ -12,6 +12,8 @@ Put pretrained SAM-B model "sam_vit_b_01ec64.pth" in:
 
 ```
 ./sam-checkpoint/
+```
+
 ---
 
 # Dataset
