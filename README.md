@@ -92,6 +92,12 @@ Example: testing on the **DeepGlobe dataset**
 python PC-SAM.py --config configs/PC-SAM_DG.yml --load_model --valid --batch_size 1
 ```
 
+To save the predictions, add the argument:
+
+```
+--save_valid_predictions
+```
+
 ---
 
 # Visualization
