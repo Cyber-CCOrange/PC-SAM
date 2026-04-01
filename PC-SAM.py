@@ -43,6 +43,7 @@ def parse_args():
     parser.add_argument('--fp_op_kernel_size', type=int, default=None, help='Override fp_op_kernel_size')
     parser.add_argument('--fn_sample_points_per_patch', type=int, default=None, help='Override fn_sample_points_per_patch')
     parser.add_argument('--fp_sample_points_per_patch', type=int, default=None, help='Override fp_sample_points_per_patch')
+    parser.add_argument('--save_valid_predictions', action='store_true', help='Save valid predictions')
     return parser.parse_args()
 
 def load_config(config_path):
@@ -78,6 +79,7 @@ def main():
     valid_show_img_mask = args.valid_show_img_mask
     load_model = args.load_model or config.get('load_model', False)
     device = args.device if args.device is not None else ("cuda" if torch.cuda.is_available() else "cpu")
+    save_valid_predictions = args.save_valid_predictions
 
     # model_save_name = model_save_name + ".pth"
     # 2. 路径参数
@@ -815,31 +817,32 @@ def main():
                     print(f"\nStep [{idx+1}/{len(dataloader)}],") 
                     print(f"Loss: {avg_loss:.4f}, Neg Segment IoU: {avg_neg_iou:.4f}, Additional Part IoU: {avg_repaired_part_iou:.4f}, Model Fusion IoU: {avg_fusion_iou:.4f}, Model Two Mask IoU: {avg_twomask_iou:.4f}, Model Fusion F1: {avg_fusion_f1:.4f}, Model Two Mask F1: {avg_twomask_f1:.4f}, Prompt IoU: {avg_prompt_iou:.4f}, IoU Prompt Predict: {avg_iou_prompt_predict:.4f}")
                 
-                # for i in range(input_image.shape[0]):
-                #     im_img = Image.fromarray(origin_input_image[i].cpu().numpy())
-                #     im_img.save(output_dir / f"{input_image_name[i].replace('.jpg', '_0_img.png')}")
-                #     im_gt = Image.fromarray(gt_mask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255)
-                #     im_gt.save(output_dir / f"{input_image_name[i].replace('.jpg', '_1_gt.png')}")
-                #     auto_mask_img = auto_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     im_auto_mask = Image.fromarray(auto_mask_img)
-                #     im_auto_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_2_automask.png')}")
-                #     mask_img = neg_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     mask_img = draw_points(mask_img, original_back_points[0][i], color=(255, 0, 0), point_size=13)
-                #     im_mask = Image.fromarray(mask_img)
-                #     im_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_3_negmask.png')}")
-                #     repaired_img = repaired_part_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     repaired_img = draw_points(repaired_img, original_fore_points[0][i], color=(0, 255, 0), point_size=13)
-                #     im_repaired = Image.fromarray(repaired_img)
-                #     im_repaired.save(output_dir / f"{input_image_name[i].replace('.jpg', '_4_posmask.png')}")
-                #     model_twomask_img = model_twomask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     im_model_twomask = Image.fromarray(model_twomask_img)
-                #     im_model_twomask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_5_twomask.png')}")
-                #     model_FusionHead_mask = model_fusionmask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     im_model_FusionHead_mask = Image.fromarray(model_FusionHead_mask)
-                #     im_model_FusionHead_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_6_fusionmask.png')}")
-                #     prompt_mask_img = hr_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
-                #     im_prompt_mask = Image.fromarray(prompt_mask_img)
-                #     im_prompt_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_7_promptmask.png')}")
+                if save_valid_predictions is True:
+                    for i in range(input_image.shape[0]):
+                        im_img = Image.fromarray(origin_input_image[i].cpu().numpy())
+                        im_img.save(output_dir / f"{input_image_name[i].replace('.jpg', '_0_img.png')}")
+                        im_gt = Image.fromarray(gt_mask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255)
+                        im_gt.save(output_dir / f"{input_image_name[i].replace('.jpg', '_1_gt.png')}")
+                        auto_mask_img = auto_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        im_auto_mask = Image.fromarray(auto_mask_img)
+                        im_auto_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_2_automask.png')}")
+                        mask_img = neg_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        mask_img = draw_points(mask_img, original_back_points[0][i], color=(255, 0, 0), point_size=13)
+                        im_mask = Image.fromarray(mask_img)
+                        im_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_3_negmask.png')}")
+                        repaired_img = repaired_part_mask_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        repaired_img = draw_points(repaired_img, original_fore_points[0][i], color=(0, 255, 0), point_size=13)
+                        im_repaired = Image.fromarray(repaired_img)
+                        im_repaired.save(output_dir / f"{input_image_name[i].replace('.jpg', '_4_posmask.png')}")
+                        model_twomask_img = model_twomask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        im_model_twomask = Image.fromarray(model_twomask_img)
+                        im_model_twomask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_5_twomask.png')}")
+                        model_FusionHead_mask = model_fusionmask[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        im_model_FusionHead_mask = Image.fromarray(model_FusionHead_mask)
+                        im_model_FusionHead_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_6_fusionmask.png')}")
+                        prompt_mask_img = hr_bin[i].squeeze(0).cpu().numpy().astype(np.uint8) * 255
+                        im_prompt_mask = Image.fromarray(prompt_mask_img)
+                        im_prompt_mask.save(output_dir / f"{input_image_name[i].replace('.jpg', '_7_promptmask.png')}")
                 
                 print(f'{input_image_name} Auto Segment IoU: {auto_segment_iou.item():.4f}, Additional Part IoU: {repaired_part_iou.item():.4f}, Model Fusion IoU: {model_fusion_iou.item():.4f}, Model Two Mask IoU: {model_twomask_iou.item():.4f}, Model Fusion F1: {f1_score_fusion.item():.4f}, Model Two Mask F1: {f1_score_twomask.item():.4f}, Prompt IoU: {prompt_iou.item():.4f}, IoU Prompt Predict: {iou_prompt_predict.item():.4f}', file=valid_iou_log)
                 
