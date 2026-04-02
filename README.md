@@ -158,12 +158,6 @@ If you find this work useful, please cite:
 
 ---
 
-# Acknowledgement
-
-This work is built upon the **Segment Anything Model (SAM)** and implemented using **PyTorch**.
-
----
-
 # License
 
 This project is released for academic research purposes.
