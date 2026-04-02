@@ -140,11 +140,14 @@ This interactive mechanism provides better controllability compared with traditi
 If you find this work useful, please cite:
 
 ```
-@inproceedings{pcsam2026,
-title={Patch-Constrained Fine-Grained Interactive Road Segmentation in High-Resolution Remote Sensing Images},
-author={XXX},
-booktitle={},
-year={2026}
+@misc{lv2026pcsampatchconstrainedfinegrainedinteractive,
+      title={PC-SAM: Patch-Constrained Fine-Grained Interactive Road Segmentation in High-Resolution Remote Sensing Images}, 
+      author={Chengcheng Lv and Rushi Li and Mincheng Wu and Xiufang Shi and Zhenyu Wen and Shibo He},
+      year={2026},
+      eprint={2604.00495},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2604.00495}, 
 }
 ```
 
