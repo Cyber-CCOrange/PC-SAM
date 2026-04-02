@@ -104,6 +104,11 @@ The predictions will be saved in:
 ./datasets/[dataset_name]/PC-SAM/
 ```
 
+The test results will be saved in the `./logs` directory:
+
+- `{model_save_name}_test_iou.log`: records the IoU for each image  
+- `{model_save_name}_test.log`: records the overall evaluation results
+
 ---
 
 # Visualization
