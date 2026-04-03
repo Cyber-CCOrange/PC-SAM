@@ -26,6 +26,8 @@ The checkpoints of our PC-SAM can be downloaded from the following link:
 - **Massachusetts**: [PC-SAM_MA.pth](https://drive.google.com/file/d/1WB5QABsau9tg6YdRUjbjNDRiSvvI2vQQ/view?usp=sharing)(451.6MB)
 - **CHN6-CUG**: [PC-SAM_CH.pth](https://drive.google.com/file/d/12cbocA61KQIzeEcqRJDibwSXrkK1RmUx/view?usp=sharing)(485.1MB)
 
+You can also download the checkpoints of PC-SAM from the model page of Hugging Face: [PC-SAM Hugging Face](https://huggingface.co/Cyber-CCOrange/PC-SAM)
+
 Place the PC-SAM checkpoints in:
 
 ```
