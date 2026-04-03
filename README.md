@@ -142,6 +142,11 @@ This interactive mechanism provides better controllability compared with traditi
 
 ---
 
+# Limitation
+
+With high-quality point prompts, PC-SAM can achieve high-precision road segmentation, demonstrating strong potential and providing flexible interaction. Nevertheless, the quality of the road masks obtained through interactive segmentation largely depends on the quality of the point prompts; incorrect prompts inevitably lead to erroneous mask results.
+
+
 # Citation
 
 If you find this work useful, please cite:
