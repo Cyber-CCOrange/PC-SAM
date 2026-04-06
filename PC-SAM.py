@@ -111,7 +111,6 @@ def main():
     model = patch_constrained_sam(
         sam_model=config.get('sam_model', "vit_b"),
         model_path=model_path,
-        # original_size=tuple(config.get('original_size', (1024, 1024))),
     )
     model.to(device)
     # print(model)
@@ -223,10 +222,6 @@ def main():
     loss_mse = nn.MSELoss()
     Augmentor = DataAugment(brightness=0.2, contrast=0.4, saturation=0.4, device=device)
 
-    # metric = SegmentationMetric(2)
-    # repaired_part_metric = SegmentationMetric(2)
-    # model_metric = SegmentationMetric(2)
-
     def check_nan_hook(module, input, output):
         if isinstance(output, torch.Tensor):
             if torch.isnan(output).any():
@@ -265,9 +260,6 @@ def main():
             dataloader_iter = iter(dataloader)
             tqdm_loader = tqdm(dataloader_iter)
             for idx, data in enumerate(tqdm_loader):
-                # for name, param in model.named_parameters():
-                #     if param.grad is not None and torch.isnan(param.grad).any():
-                #         print("NaN in grad:", name)
 
                 input_image = data['image'].to(device)
                 input_image_name = data['image_name']
@@ -305,7 +297,6 @@ def main():
 
                 optimizer.zero_grad()
 
-                # with autocast(device_type='cuda', enabled=True, dtype=torch.bfloat16):
                 (upscaled_masks, 
                  repaired_masks,
                  model_logits,
@@ -314,16 +305,6 @@ def main():
                                             fore_points,
                                             back_points,
                                             original_size[0])
-
-                # model_logits = upscaled_masks + repaired_masks
-                # pred_prob = torch.sigmoid(upscaled_masks)   # B, 1, H, W
-                # repaired_prob = torch.sigmoid(repaired_masks)
-                # model_prob = torch.sigmoid(model_logits)
-
-                # 取 pred_mask 和 hard_part_mask 在原始图像非全白区域的部分
-                # pred_mask_nonwhite_keepdim = pred_mask * not_white_mask
-                # hard_part_mask_nonwhite_keepdim = hard_part_mask * not_white_mask
-                # gt_mask_nonwhite_keepdim = gt_mask * not_white_mask
                 
                 with torch.no_grad():
                     prompt_bin = (prompt_masks > 0).float().squeeze(1)
@@ -352,8 +333,7 @@ def main():
                 loss_pos = 0.3 * loss_dice(repaired_masks, pos_label) + 0.7 * loss_focal(repaired_masks, pos_label)
                 loss_model = 0.3 * loss_dice(model_logits, model_label) + 0.7 * loss_focal(model_logits, model_label)
                 loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt + 0.1 * loss_delete_part
-                # loss = loss_prompt + loss_iou_prompt
-                # print(loss_delete_part)
+
                 scheduler(optimizer, idx, epoch, Best_IoU)
 
                 loss.backward()
@@ -404,10 +384,6 @@ def main():
                     avg_twomask_iou = Model_TwoMask_IoU / Model_TwoMask_IoU_Count
                 else:
                     avg_twomask_iou = 0.0
-
-                # stage1_hard_part_label = differentiable_opening(stage1_hard_part_label, erosion_kernel_size=5, dilation_kernel_size=3)
-                # stage1_hard_road_part_logits = differentiable_opening(stage1_hard_road_part_logits, erosion_kernel_size=5, dilation_kernel_size=3)
-                # stage1_hard_part_mask_bin = differentiable_opening(stage1_hard_part_mask_bin.unsqueeze(1), erosion_kernel_size=5, dilation_kernel_size=3)
                 
                 # print(iou)
                 # show_tensor_image(input_image, input_image_name, is_mask=False)
@@ -593,17 +569,14 @@ def main():
                 f1_score_fusion, model_fusion_precision, model_fusion_recall = compute_F1(model_fusionmask, gt_mask, pre_rec=True)
                 f1_score_twomask, model_twomask_precision, model_twomask_recall = compute_F1(model_twomask, gt_mask, pre_rec=True)
 
-                # metric.CM(gt_mask.cpu(), mask_bin.squeeze(1).cpu().data.numpy())
-                # repaired_part_metric.CM(pos_label.cpu(), repaired_part_mask_bin.squeeze(1).cpu().data.numpy())
-                # model_metric.CM(gt_mask.cpu(), model_fusionmask.squeeze(1).cpu().data.numpy())
 
                 loss_iou_prompt = loss_mse(iou_prompt_predict, prompt_iou.unsqueeze(0).reshape(1, 1))
                 loss_prompt = 0.3 * loss_dice(hr_masks, gt_mask) + 0.7 * loss_ss(hr_masks, gt_mask)
                 loss_neg = 0.3 * loss_dice(upscaled_masks, gt_mask) + 0.7 * loss_focal(upscaled_masks, gt_mask)
                 loss_pos = 0.3 * loss_dice(repaired_masks, pos_label) + 0.7 * loss_focal(repaired_masks, pos_label)# + 0.05 * loss_ss(repaired_prob, pos_label)
                 loss_model = 0.3 * loss_dice(model_logits, gt_mask) + 0.7 * loss_focal(model_logits, gt_mask)
-                # loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt
-                loss = loss_prompt + loss_iou_prompt
+                loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt
+
 
                 Prompt_IoU_Predict += iou_prompt_predict.item()
                 avg_iou_prompt_predict = Prompt_IoU_Predict / (idx+1)
@@ -861,9 +834,6 @@ def main():
                     plt.show()
                     input("")
 
-            # oare_iou = metric.IOU()[1]
-            # oare_repaired_part_iou = repaired_part_metric.IOU()[1]
-            # oare_model_iou = model_metric.IOU()[1]
 
             valid_log_dir = 'logs/' + model_save_name + '_test.log'
             if not os.path.exists(valid_log_dir):

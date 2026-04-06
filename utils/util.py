@@ -1,7 +1,6 @@
 from ast import Tuple
 import torch
 import torch.nn as nn
-from scipy.optimize import linear_sum_assignment
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
