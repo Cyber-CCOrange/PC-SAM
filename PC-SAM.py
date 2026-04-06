@@ -111,7 +111,6 @@ def main():
     model = patch_constrained_sam(
         sam_model=config.get('sam_model', "vit_b"),
         model_path=model_path,
-        # original_size=tuple(config.get('original_size', (1024, 1024))),
     )
     model.to(device)
     # print(model)
