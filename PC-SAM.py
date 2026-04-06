@@ -111,6 +111,7 @@ def main():
     model = patch_constrained_sam(
         sam_model=config.get('sam_model', "vit_b"),
         model_path=model_path,
+        # original_size=tuple(config.get('original_size', (1024, 1024))),
     )
     model.to(device)
     # print(model)
@@ -221,6 +222,7 @@ def main():
     loss_ss = SSLoss(kernel_size=5, only_one=False)
     loss_mse = nn.MSELoss()
     Augmentor = DataAugment(brightness=0.2, contrast=0.4, saturation=0.4, device=device)
+
 
     def check_nan_hook(module, input, output):
         if isinstance(output, torch.Tensor):
@@ -333,7 +335,8 @@ def main():
                 loss_pos = 0.3 * loss_dice(repaired_masks, pos_label) + 0.7 * loss_focal(repaired_masks, pos_label)
                 loss_model = 0.3 * loss_dice(model_logits, model_label) + 0.7 * loss_focal(model_logits, model_label)
                 loss = loss_neg + loss_pos + loss_model + loss_prompt + loss_iou_prompt + 0.1 * loss_delete_part
-
+                # loss = loss_prompt + loss_iou_prompt
+                # print(loss_delete_part)
                 scheduler(optimizer, idx, epoch, Best_IoU)
 
                 loss.backward()
@@ -384,6 +387,7 @@ def main():
                     avg_twomask_iou = Model_TwoMask_IoU / Model_TwoMask_IoU_Count
                 else:
                     avg_twomask_iou = 0.0
+
                 
                 # print(iou)
                 # show_tensor_image(input_image, input_image_name, is_mask=False)
@@ -833,7 +837,6 @@ def main():
                     )
                     plt.show()
                     input("")
-
 
             valid_log_dir = 'logs/' + model_save_name + '_test.log'
             if not os.path.exists(valid_log_dir):
