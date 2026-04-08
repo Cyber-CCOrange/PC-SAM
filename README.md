@@ -152,14 +152,11 @@ With high-quality point prompts, PC-SAM can achieve high-precision road segmenta
 If you find this work useful, please cite:
 
 ```
-@misc{lv2026pcsampatchconstrainedfinegrainedinteractive,
-      title={PC-SAM: Patch-Constrained Fine-Grained Interactive Road Segmentation in High-Resolution Remote Sensing Images}, 
-      author={Chengcheng Lv and Rushi Li and Mincheng Wu and Xiufang Shi and Zhenyu Wen and Shibo He},
-      year={2026},
-      eprint={2604.00495},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2604.00495}, 
+@article{lv2026pc,
+  title={PC-SAM: Patch-Constrained Fine-Grained Interactive Road Segmentation in High-Resolution Remote Sensing Images},
+  author={Lv, Chengcheng and Li, Rushi and Wu, Mincheng and Shi, Xiufang and Wen, Zhenyu and He, Shibo},
+  journal={arXiv preprint arXiv:2604.00495},
+  year={2026}
 }
 ```
 
